@@ -1,0 +1,2 @@
+# Ce fichier assure que le dossier videos est inclus dans git
+# Les fichiers vidéo réels sont ignorés par .gitignore

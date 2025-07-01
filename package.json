@@ -1,0 +1,54 @@
+{
+  "name": "video-uploader-ai",
+  "version": "1.0.0",
+  "description": "Cross-platform video uploader with AI-powered clip generation",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "backend": "cd backend && npm start",
+    "backend:dev": "cd backend && npm run dev",
+    "mobile": "cd mobile && npx react-native start",
+    "setup": "./setup.sh",
+    "deploy": "./deploy.sh",
+    "dev:all": "./dev.sh",
+    "install:all": "npm install && cd backend && npm install && cd ../mobile && npm install",
+    "test:complete": "node test-complete-flow.js",
+    "test:cloud": "node test-cloud-storage.js",
+    "test:api": "node test-api.js",
+    "test:captions": "node test-captions.js",
+    "test:edit": "node test-edit.js",
+    "test:all": "npm run test:api && npm run test:complete && npm run test:cloud",
+    "health": "node health-check.js",
+    "health:watch": "watch 'npm run health' ."
+  },
+  "dependencies": {
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/typography": "^0.5.16",
+    "axios": "^1.6.0",
+    "framer-motion": "^10.16.0",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.3.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.52.0",
+    "eslint-config-next": "^14.0.0",
+    "postcss": "^8.4.31"
+  },
+  "keywords": [
+    "video",
+    "uploader",
+    "AI",
+    "clips",
+    "cross-platform"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

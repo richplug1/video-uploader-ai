@@ -1,0 +1,2 @@
+# Ce fichier assure que le dossier clips est inclus dans git
+# Les fichiers clip réels sont ignorés par .gitignore
