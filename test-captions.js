@@ -27,7 +27,7 @@ async function testCaptionFeatures() {
     });
     
     console.log('✅ Vidéo uploadée:', uploadResponse.data.video.filename);
-    const uploadedVideoPath = uploadResponse.data.video.path;
+    const uploadedVideoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.path;
     
     // 2. Test génération de clips SANS captions
     console.log('\n2. Génération de clips sans captions...');

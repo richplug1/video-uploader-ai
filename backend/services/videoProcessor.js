@@ -636,6 +636,84 @@ ${text}
   }
 
   /**
+   * Generate multiple clips with AI-detected segments
+   */
+  async generateMultipleClipsWithAISegments({ inputPath, outputDir, settings, aiSegments = [] }) {
+    const { numClips, duration, aspectRatio, captions, captionOptions } = settings;
+    
+    // Get video metadata first
+    const metadata = await this.getVideoMetadata(inputPath);
+    const videoDuration = metadata.duration;
+    const clipDurationSeconds = this.parseDuration(duration);
+    
+    if (videoDuration < clipDurationSeconds) {
+      throw new Error('Video is shorter than requested clip duration');
+    }
+
+    const clips = [];
+    const promises = [];
+
+    // Use AI segments if available, otherwise fall back to regular generation
+    const useAISegments = aiSegments && aiSegments.length >= numClips;
+    
+    for (let i = 0; i < numClips; i++) {
+      const clipId = uuidv4();
+      const clipFilename = `clip_${clipId}.mp4`;
+      const outputPath = path.join(outputDir, clipFilename);
+      
+      let startTime;
+      let confidence = 0.5;
+      let reason = 'Standard segment';
+      
+      if (useAISegments && aiSegments[i]) {
+        // Use AI-detected segment
+        startTime = aiSegments[i].startTime;
+        confidence = aiSegments[i].confidence;
+        reason = aiSegments[i].reason;
+        console.log(`🤖 Using AI segment ${i + 1}: ${reason} (confidence: ${confidence.toFixed(2)})`);
+      } else {
+        // Fall back to calculated start time
+        startTime = this.calculateStartTime(i, numClips, videoDuration, clipDurationSeconds);
+        console.log(`📐 Using calculated segment ${i + 1} at ${startTime}s`);
+      }
+
+      const clipPromise = this.generateClipWithCloudUpload({
+        inputPath,
+        outputPath,
+        startTime,
+        duration: clipDurationSeconds,
+        aspectRatio,
+        addCaptions: captions,
+        captionOptions: captionOptions || {}
+      }).then((result) => {
+        clips.push({
+          id: clipId,
+          filename: clipFilename,
+          localPath: result.localPath,
+          cloudUrl: result.cloudUrl,
+          cloudPath: result.cloudPath,
+          provider: result.provider,
+          startTime,
+          duration: clipDurationSeconds,
+          aspectRatio,
+          captions,
+          aiAnalysis: {
+            confidence,
+            reason,
+            isAIGenerated: useAISegments && aiSegments[i] ? true : false
+          },
+          error: result.error || null
+        });
+      });
+
+      promises.push(clipPromise);
+    }
+
+    await Promise.all(promises);
+    return clips;
+  }
+
+  /**
    * Get download URL for cloud-stored file
    */
   async getDownloadUrl(cloudPath, expiresIn = 3600) {

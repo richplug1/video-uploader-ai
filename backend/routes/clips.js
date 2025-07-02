@@ -30,20 +30,36 @@ router.post('/generate', async (req, res) => {
     }
 
     const processor = new VideoProcessor();
+    const aiService = new AIService();
     const clipsDir = path.join(__dirname, '../uploads/clips');
     
     if (!fs.existsSync(clipsDir)) {
       fs.mkdirSync(clipsDir, { recursive: true });
     }
 
-    // Generate multiple clips with cloud storage integration
-    const generatedClips = await processor.generateMultipleClipsWithCloudUpload({
+    // Use AI to find interesting segments
+    let segments = [];
+    try {
+      console.log('🤖 Using AI to analyze video for interesting segments...');
+      segments = await aiService.findInterestingSegments(
+        videoPath, 
+        parseInt(settings.numClips) || 1, 
+        settings.duration
+      );
+      console.log(`✅ AI found ${segments.length} interesting segments`);
+    } catch (aiError) {
+      console.warn('AI analysis failed, using fallback:', aiError.message);
+    }
+
+    // Generate clips using AI-detected segments or fallback to regular generation
+    const generatedClips = await processor.generateMultipleClipsWithAISegments({
       inputPath: videoPath,
       outputDir: clipsDir,
       settings: {
         ...settings,
         numClips: parseInt(settings.numClips) || 1
-      }
+      },
+      aiSegments: segments
     });
 
     // Format response with URLs (cloud or local)
@@ -540,6 +556,45 @@ router.get('/info/:clipId', async (req, res) => {
     console.error('File info error:', error);
     res.status(500).json({ 
       error: 'Failed to get file info',
+      message: error.message 
+    });
+  }
+});
+
+// AI-powered settings suggestion endpoint
+router.post('/suggest-settings', async (req, res) => {
+  try {
+    const { videoPath } = req.body;
+
+    if (!videoPath) {
+      return res.status(400).json({ error: 'Video path required' });
+    }
+
+    if (!fs.existsSync(videoPath)) {
+      return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    const aiService = new AIService();
+    
+    // Get AI-powered settings suggestions
+    const suggestions = await aiService.suggestOptimalSettings(videoPath);
+    
+    // Get additional AI insights
+    const hashtags = await aiService.suggestHashtags(videoPath);
+
+    res.json({
+      success: true,
+      suggestions: {
+        ...suggestions,
+        recommendedHashtags: hashtags
+      },
+      message: 'AI analysis complete - settings optimized for your video content'
+    });
+
+  } catch (error) {
+    console.error('AI settings suggestion error:', error);
+    res.status(500).json({ 
+      error: 'Failed to analyze video for optimal settings',
       message: error.message 
     });
   }

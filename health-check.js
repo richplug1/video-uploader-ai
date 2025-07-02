@@ -5,6 +5,50 @@ const fs = require('fs');
 const path = require('path');
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
+const FRONTEND_URL = 'http://localhost:3000';
+
+async function quickHealthCheck() {
+  console.log('🩺 QUICK HEALTH CHECK');
+  console.log('='.repeat(30));
+  
+  // Backend check
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 3000 });
+    console.log('✅ Backend: ONLINE');
+    console.log(`   Status: ${response.data.status}`);
+    console.log(`   Uptime: ${Math.floor(response.data.uptime)}s`);
+  } catch (error) {
+    console.log('❌ Backend: OFFLINE');
+    console.log(`   Error: ${error.code || error.message}`);
+    console.log('   💡 Run: cd backend && node server.js');
+  }
+  
+  // Frontend check
+  try {
+    const response = await axios.get(FRONTEND_URL, { timeout: 3000 });
+    console.log('✅ Frontend: ONLINE');
+    console.log(`   Status: ${response.status}`);
+  } catch (error) {
+    console.log('❌ Frontend: OFFLINE');
+    console.log(`   Error: ${error.code || error.message}`);
+    console.log('   💡 Run: npm run dev');
+  }
+  
+  console.log('='.repeat(30));
+  console.log('🌐 Frontend: http://localhost:3000');
+  console.log('🔧 Backend:  http://localhost:3001');
+  
+  // Quick API test
+  try {
+    await axios.post(`${API_BASE_URL}/api/clips/suggest-settings`, {}, { timeout: 2000 });
+  } catch (error) {
+    if (error.response?.status === 400) {
+      console.log('✅ API Routes: WORKING');
+    } else {
+      console.log('⚠️  API Routes: CHECK NEEDED');
+    }
+  }
+}
 
 async function performHealthCheck() {
   console.log('🏥 Performing health check for Video Uploader AI...\n');
@@ -298,5 +342,15 @@ axios.interceptors.response.use(
   }
 );
 
-// Run health check
-performHealthCheck().catch(console.error);
+// Run health check if called directly
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.includes('--quick')) {
+    quickHealthCheck().catch(console.error);
+  } else {
+    performHealthCheck().catch(console.error);
+  }
+}
+
+// Export functions
+module.exports = { performHealthCheck, quickHealthCheck };

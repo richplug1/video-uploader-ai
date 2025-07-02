@@ -37,7 +37,7 @@ async function testCloudStorageIntegration() {
       return;
     }
 
-    const videoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.cloudPath || uploadResponse.data.video.path;
+    const videoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.cloudPath || uploadResponse.data.video.localPath || uploadResponse.data.video.path;
 
     // Test 2: Generate clips with cloud storage
     console.log('\n2. Testing clip generation with cloud storage...');

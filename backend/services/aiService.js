@@ -60,12 +60,25 @@ class AIService {
   }
 
   /**
-   * Generate captions for video using AI
+   * Generate captions for video using AI (enhanced with OpenAI Whisper)
    */
   async generateCaptions(videoPath) {
     try {
-      // This would integrate with speech-to-text services
-      // For now, return placeholder captions
+      // Extract audio from video first
+      const audioPath = await this.extractAudioForTranscription(videoPath);
+      
+      if (this.openaiApiKey) {
+        // Use OpenAI Whisper for speech-to-text
+        try {
+          const transcription = await this.transcribeWithWhisper(audioPath);
+          return this.formatTranscriptionToSRT(transcription);
+        } catch (openaiError) {
+          console.warn('OpenAI transcription failed:', openaiError);
+        }
+      }
+      
+      // Fallback to placeholder captions
+      console.log('Using placeholder captions (no OpenAI API key or transcription failed)');
       return [
         { start: 0, end: 5, text: "Welcome to our video!" },
         { start: 5, end: 10, text: "Here's something interesting..." },
@@ -75,6 +88,69 @@ class AIService {
       console.error('Caption generation error:', error);
       return [];
     }
+  }
+
+  /**
+   * Extract audio from video for transcription
+   */
+  async extractAudioForTranscription(videoPath) {
+    const VideoProcessor = require('./videoProcessor');
+    const processor = new VideoProcessor();
+    
+    const audioPath = videoPath.replace(/\.[^/.]+$/, "_audio.wav");
+    
+    // Use FFmpeg to extract audio (this would need to be implemented in VideoProcessor)
+    // For now, return the video path as placeholder
+    return videoPath;
+  }
+
+  /**
+   * Transcribe audio using OpenAI Whisper
+   */
+  async transcribeWithWhisper(audioPath) {
+    if (!this.openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const openai = require('openai');
+    const client = new openai.OpenAI({
+      apiKey: this.openaiApiKey,
+    });
+
+    const fs = require('fs');
+    
+    try {
+      const transcription = await client.audio.transcriptions.create({
+        file: fs.createReadStream(audioPath),
+        model: "whisper-1",
+        response_format: "verbose_json",
+        timestamp_granularities: ["segment"]
+      });
+
+      return transcription;
+    } catch (error) {
+      console.error('Whisper transcription error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Format OpenAI transcription to SRT format
+   */
+  formatTranscriptionToSRT(transcription) {
+    if (!transcription.segments) {
+      return [{
+        start: 0,
+        end: transcription.duration || 30,
+        text: transcription.text || "Generated content"
+      }];
+    }
+
+    return transcription.segments.map(segment => ({
+      start: segment.start,
+      end: segment.end,
+      text: segment.text.trim()
+    }));
   }
 
   /**

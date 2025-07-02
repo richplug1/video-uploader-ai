@@ -32,7 +32,7 @@ async function testVideoUploadAndClipGeneration() {
     });
     
     console.log('✅ Vidéo uploadée:', uploadResponse.data);
-    const uploadedVideoPath = uploadResponse.data.video.path;
+    const uploadedVideoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.path;
     
     // 3. Génération de clips avec différents ratios d'aspect
     console.log('\n3. Génération de clips avec différents ratios d\'aspect...');
@@ -42,7 +42,7 @@ async function testVideoUploadAndClipGeneration() {
         name: 'Landscape (16:9)',
         settings: {
           duration: 15,
-          aspectRatio: 16/9,
+          aspectRatio: "16:9",
           numClips: 1,
           captions: false
         }
@@ -51,7 +51,7 @@ async function testVideoUploadAndClipGeneration() {
         name: 'Portrait (9:16)',
         settings: {
           duration: 15,
-          aspectRatio: 9/16,
+          aspectRatio: "9:16",
           numClips: 1,
           captions: false
         }
@@ -60,7 +60,7 @@ async function testVideoUploadAndClipGeneration() {
         name: 'Square (1:1)',
         settings: {
           duration: 15,
-          aspectRatio: 1,
+          aspectRatio: "1:1",
           numClips: 1,
           captions: false
         }

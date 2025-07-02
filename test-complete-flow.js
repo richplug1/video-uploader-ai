@@ -74,7 +74,7 @@ async function testCompleteFlow() {
     console.log('3. Testing clip generation with cloud storage...');
     
     // Use the correct path from upload response
-    const videoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.path;
+    const videoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.localPath || uploadResponse.data.video.path;
     
     const clipSettings = {
       videoPath: videoPath,

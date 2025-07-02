@@ -27,7 +27,7 @@ async function testEditFeatures() {
     });
     
     console.log('✅ Vidéo uploadée:', uploadResponse.data.video.filename);
-    const uploadedVideoPath = uploadResponse.data.video.path;
+    const uploadedVideoPath = uploadResponse.data.video.localPath || uploadResponse.data.video.path;
     
     // 2. Génération d'un clip de base
     console.log('\n2. Génération d\'un clip de base...');

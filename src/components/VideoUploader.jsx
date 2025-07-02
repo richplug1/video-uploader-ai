@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
 const VideoUploader = () => {
@@ -40,9 +40,44 @@ const VideoUploader = () => {
   const [error, setError] = useState(null);
   const [editingClip, setEditingClip] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState('Local');
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef();
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Use effect to set mounted state and avoid hydration issues
+  React.useEffect(() => {
+    setMounted(true);
+    // Test backend connectivity
+    checkBackendConnectivity();
+  }, []);
+
+  // Clic automatique sur le bouton "Continuer" si présent
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const btn = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'))
+        .find(el => el.textContent?.trim().toLowerCase() === 'continuer' || el.value?.trim().toLowerCase() === 'continuer');
+      if (btn) {
+        btn.click();
+        clearInterval(interval);
+      }
+    }, 300);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check backend connectivity
+  const checkBackendConnectivity = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/health`);
+      if (response.data.status === 'OK') {
+        console.log('✅ Backend connected successfully');
+      }
+    } catch (error) {
+      console.error('❌ Backend connection failed:', error);
+      setError('Unable to connect to backend server. Please ensure the server is running.');
+    }
+  };
 
   // Format duration for display
   const formatDuration = (seconds) => {
@@ -151,6 +186,52 @@ const VideoUploader = () => {
     } catch (error) {
       console.error('Clip generation error:', error);
       setError('Failed to generate clips. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Get AI-powered settings suggestions
+  const getAISuggestions = async () => {
+    if (!uploadedVideoPath) {
+      setError('Please upload a video first before getting AI suggestions.');
+      return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/clips/suggest-settings`, {
+        videoPath: uploadedVideoPath
+      });
+
+      if (response.data.success) {
+        const suggestions = response.data.suggestions;
+        
+        // Apply AI suggestions to settings
+        setSettings(prevSettings => ({
+          ...prevSettings,
+          duration: suggestions.duration,
+          aspectRatio: parseFloat(suggestions.aspectRatio.split(':')[0]) / parseFloat(suggestions.aspectRatio.split(':')[1]),
+          numClips: suggestions.numClips,
+          captions: suggestions.captions
+        }));
+
+        // Show suggested hashtags
+        if (suggestions.recommendedHashtags) {
+          console.log('🤖 AI Suggested Hashtags:', suggestions.recommendedHashtags.join(', '));
+        }
+
+        console.log('🤖 AI Settings Applied:', suggestions);
+      }
+    } catch (error) {
+      console.error('AI suggestions error:', error);
+      if (error.response?.status === 404) {
+        setError('AI suggestions service not available. Please try again later.');
+      } else if (error.response?.data?.error) {
+        setError(`AI error: ${error.response.data.error}`);
+      } else {
+        setError('Failed to get AI suggestions. Using default settings.');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -418,8 +499,38 @@ const VideoUploader = () => {
     );
   };
 
+  // Dashboard status panel
+  const currentCloudStatus = clips.length > 0 ? (clips[0].provider && clips[0].provider !== 'local' ? 'Cloud' : 'Local') : cloudStatus;
+  const aiStatus = 'Active';
+  const totalDuration = clips.reduce((sum, c) => sum + (c.duration || 0), 0);
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return <div className="video-uploader">Loading...</div>;
+  }
+
   return (
     <div className="video-uploader">
+      {/* Dashboard Status Panel */}
+      <div className="dashboard-status">
+        <div className="status-item">
+          <span className="status-label">Cloud Storage:</span>
+          <span className={`status-value ${currentCloudStatus === 'Cloud' ? 'cloud' : 'local'}`}>{currentCloudStatus}</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">AI Services:</span>
+          <span className="status-value ai">{aiStatus}</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Clips:</span>
+          <span className="status-value clips">{clips.length}</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Total Duration:</span>
+          <span className="status-value duration">{formatDuration(totalDuration)}</span>
+        </div>
+      </div>
+
       {/* Error Message */}
       {error && (
         <div className="error-message">
@@ -441,7 +552,7 @@ const VideoUploader = () => {
           onClick={() => fileInputRef.current.click()}
           disabled={isUploading}
         >
-          {isUploading ? 'Uploading...' : 'Upload Video'}
+          <span role="img" aria-label="upload">⬆️</span> {isUploading ? 'Uploading...' : 'Upload Video'}
         </button>
         
         {/* Upload Progress */}
@@ -473,131 +584,142 @@ const VideoUploader = () => {
         )}
       </div>
 
-      {/* Settings Panel */}
-      <div className="settings-panel">
-        <h3>Clip Settings</h3>
-        
-        <div className="setting-group">
-          <label>Duration:</label>
-          <select 
-            value={settings.duration}
-            onChange={(e) => setSettings({...settings, duration: parseInt(e.target.value)})}
-          >
-            {durationOptions.map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="setting-group">
-          <label>Aspect Ratio:</label>
-          <select 
-            value={settings.aspectRatio}
-            onChange={(e) => setSettings({...settings, aspectRatio: parseFloat(e.target.value)})}
-          >
-            {aspectRatios.map(ratio => (
-              <option key={ratio.value} value={ratio.value}>
-                {ratio.label} - {ratio.display}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="setting-group">
-          <label>Number of Clips (1-8):</label>
-          <input 
-            type="number" 
-            min="1" 
-            max="8" 
-            value={settings.numClips}
-            onChange={(e) => setSettings({...settings, numClips: e.target.value})}
-          />
-        </div>
-
-        <div className="setting-group">
-          <label>Captions:</label>
-          <label className="switch">
-            <input 
-              type="checkbox" 
-              checked={settings.captions}
-              onChange={(e) => setSettings({...settings, captions: e.target.checked})}
-            />
-            <span className="slider"></span>
-          </label>
-        </div>
-
-        {/* Caption Style Options */}
-        {settings.captions && (
-          <div className="caption-options">
-            <h4>Caption Style</h4>
-            
-            <div className="setting-group">
-              <label>Font Size:</label>
-              <select 
-                value={settings.captionStyle.fontSize}
-                onChange={(e) => setSettings({
-                  ...settings, 
-                  captionStyle: {...settings.captionStyle, fontSize: parseInt(e.target.value)}
-                })}
-              >
-                <option value={16}>Small (16px)</option>
-                <option value={20}>Medium (20px)</option>
-                <option value={24}>Large (24px)</option>
-                <option value={28}>Extra Large (28px)</option>
-                <option value={32}>Huge (32px)</option>
-              </select>
-            </div>
-
-            <div className="setting-group">
-              <label>Font Color:</label>
-              <select 
-                value={settings.captionStyle.fontColor}
-                onChange={(e) => setSettings({
-                  ...settings, 
-                  captionStyle: {...settings.captionStyle, fontColor: e.target.value}
-                })}
-              >
-                <option value="white">White</option>
-                <option value="black">Black</option>
-                <option value="yellow">Yellow</option>
-                <option value="red">Red</option>
-                <option value="blue">Blue</option>
-              </select>
-            </div>
-
-            <div className="setting-group">
-              <label>Position:</label>
-              <select 
-                value={settings.captionStyle.position}
-                onChange={(e) => setSettings({
-                  ...settings, 
-                  captionStyle: {...settings.captionStyle, position: e.target.value}
-                })}
-              >
-                <option value="bottom">Bottom</option>
-                <option value="center">Center</option>
-                <option value="top">Top</option>
-              </select>
-            </div>
+      {/* Settings & AI Panel */}
+      <div className="dashboard-flex">
+        <div className="settings-panel">
+          <h3>Clip Settings</h3>
+          <div className="setting-group">
+            <label>Duration:</label>
+            <select 
+              value={settings.duration}
+              onChange={(e) => setSettings({...settings, duration: parseInt(e.target.value)})}
+            >
+              {durationOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
-        )}
-
-        <button 
-          onClick={generateClips} 
-          disabled={!uploadedVideoPath || isGenerating || isUploading}
-          className={isGenerating ? 'generating' : ''}
-        >
-          {isGenerating ? 'Generating Clips...' : 'Generate Clips'}
-        </button>
+          <div className="setting-group">
+            <label>Aspect Ratio:</label>
+            <select 
+              value={settings.aspectRatio}
+              onChange={(e) => setSettings({...settings, aspectRatio: parseFloat(e.target.value)})}
+            >
+              {aspectRatios.map(ratio => (
+                <option key={ratio.value} value={ratio.value}>
+                  {ratio.label} - {ratio.display}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="setting-group">
+            <label>Number of Clips (1-8):</label>
+            <input 
+              type="number" 
+              min="1" 
+              max="8" 
+              value={settings.numClips}
+              onChange={(e) => setSettings({...settings, numClips: e.target.value})}
+            />
+          </div>
+          <div className="setting-group">
+            <label>Captions:</label>
+            <label className="switch">
+              <input 
+                type="checkbox" 
+                checked={settings.captions}
+                onChange={(e) => setSettings({...settings, captions: e.target.checked})}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
+          {/* Caption Style Options */}
+          {settings.captions && (
+            <div className="caption-options">
+              <h4>Caption Style</h4>
+              <div className="setting-group">
+                <label>Font Size:</label>
+                <select 
+                  value={settings.captionStyle.fontSize}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    captionStyle: {...settings.captionStyle, fontSize: parseInt(e.target.value)}
+                  })}
+                >
+                  <option value={16}>Small (16px)</option>
+                  <option value={20}>Medium (20px)</option>
+                  <option value={24}>Large (24px)</option>
+                  <option value={28}>Extra Large (28px)</option>
+                  <option value={32}>Huge (32px)</option>
+                </select>
+              </div>
+              <div className="setting-group">
+                <label>Font Color:</label>
+                <select 
+                  value={settings.captionStyle.fontColor}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    captionStyle: {...settings.captionStyle, fontColor: e.target.value}
+                  })}
+                >
+                  <option value="white">White</option>
+                  <option value="black">Black</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="red">Red</option>
+                  <option value="blue">Blue</option>
+                </select>
+              </div>
+              <div className="setting-group">
+                <label>Position:</label>
+                <select 
+                  value={settings.captionStyle.position}
+                  onChange={(e) => setSettings({
+                    ...settings, 
+                    captionStyle: {...settings.captionStyle, position: e.target.value}
+                  })}
+                >
+                  <option value="bottom">Bottom</option>
+                  <option value="center">Center</option>
+                  <option value="top">Top</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <button 
+            onClick={generateClips} 
+            disabled={!uploadedVideoPath || isGenerating || isUploading}
+            className={isGenerating ? 'generating' : ''}
+          >
+            <span role="img" aria-label="scissors">✂️</span> {isGenerating ? 'Generating Clips...' : 'Generate Clips'}
+          </button>
+        </div>
+        {/* AI Suggestions Section - now more visible */}
+        <div className="ai-suggestions-panel">
+          <h3>🤖 AI Assistant</h3>
+          <button 
+            onClick={getAISuggestions} 
+            disabled={!uploadedVideoPath || isGenerating}
+            className="ai-suggest-button"
+          >
+            <span role="img" aria-label="magic">✨</span> {isGenerating ? 'Analyzing Video...' : 'Get AI Recommendations'}
+          </button>
+          <p className="ai-description">
+            Let AI analyze your video and suggest optimal settings for maximum engagement.
+          </p>
+        </div>
       </div>
 
       {/* Generated Clips Section */}
       {clips.length > 0 && (
         <div className="clips-section">
-          <h3>Generated Clips</h3>
+          <div className="clips-summary">
+            <span className="summary-item"><b>{clips.length}</b> clips</span>
+            <span className="summary-item"><b>{formatDuration(totalDuration)}</b> total</span>
+            <span className="summary-item"><b>{cloudStatus}</b> storage</span>
+          </div>
           <div className="clips-grid">
             {clips.map(clip => (
-              <div key={clip.id} className={`clip-card ${getAspectRatioClass(clip.aspectRatio)}`}>
+              <div key={clip.id} className={`clip-card ${getAspectRatioClass(clip.aspectRatio)} ${clip.provider && clip.provider !== 'local' ? 'cloud-stored' : ''} ${clip.provider === 'local' ? 'local-stored' : ''} ${clip.error ? 'error-state' : ''}`}>
                 <div className="clip-header">
                   <div className="clip-status">
                     {clip.provider && clip.provider !== 'local' && (

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 10px 20px; margin: 5px; }
+        #results { background: #f5f5f5; padding: 15px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Video Uploader AI - API Test Page</h1>
+    
+    <div class="test-section">
+        <h3>Backend Status</h3>
+        <button onclick="testHealth()">Test Health Check</button>
+        <button onclick="testAllEndpoints()">Test All Endpoints</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Upload Test</h3>
+        <input type="file" id="videoFile" accept="video/*">
+        <button onclick="testVideoUpload()">Upload Video</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Results</h3>
+        <div id="results">Cliquez sur un bouton pour tester...</div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001';
+        
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.innerHTML += `<div class="${type}">[${timestamp}] ${message}</div>`;
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        async function testHealth() {
+            log('Testing /api/health...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/health`);
+                const data = await response.json();
+                log(`✅ Health check: ${response.status} - ${JSON.stringify(data)}`, 'success');
+            } catch (error) {
+                log(`❌ Health check failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAllEndpoints() {
+            const endpoints = [
+                { method: 'GET', path: '/api/health' },
+                { method: 'POST', path: '/api/clips/suggest-settings', body: { videoPath: 'test' } },
+                { method: 'GET', path: '/api/clips/info/test-id' },
+                { method: 'GET', path: '/api/nonexistent' }
+            ];
+            
+            for (const endpoint of endpoints) {
+                log(`Testing ${endpoint.method} ${endpoint.path}...`, 'info');
+                try {
+                    const options = {
+                        method: endpoint.method,
+                        headers: { 'Content-Type': 'application/json' }
+                    };
+                    
+                    if (endpoint.body) {
+                        options.body = JSON.stringify(endpoint.body);
+                    }
+                    
+                    const response = await fetch(`${API_BASE_URL}${endpoint.path}`, options);
+                    const data = await response.json();
+                    log(`${response.status}: ${JSON.stringify(data).substring(0, 100)}...`, response.ok ? 'success' : 'error');
+                } catch (error) {
+                    log(`❌ ${endpoint.path}: ${error.message}`, 'error');
+                }
+            }
+        }
+        
+        async function testVideoUpload() {
+            const fileInput = document.getElementById('videoFile');
+            if (!fileInput.files[0]) {
+                log('❌ Please select a video file first', 'error');
+                return;
+            }
+            
+            log('Testing video upload...', 'info');
+            try {
+                const formData = new FormData();
+                formData.append('video', fileInput.files[0]);
+                
+                const response = await fetch(`${API_BASE_URL}/api/video/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                log(`Upload: ${response.status} - ${JSON.stringify(data)}`, response.ok ? 'success' : 'error');
+            } catch (error) {
+                log(`❌ Upload failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-test au chargement
+        window.onload = () => {
+            log('🚀 API Test Page loaded', 'info');
+            testHealth();
+        };
+    </script>
+</body>
+</html>
